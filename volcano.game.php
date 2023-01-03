@@ -42,8 +42,7 @@ class Volcano extends Table
         ) );        
 	}
 	
-    protected function getGameName( )
-    {
+    protected function getGameName(){
 		// Used for translations and stuff. Please do not modify.
         return "volcano";
     }	
@@ -55,8 +54,7 @@ class Volcano extends Table
         In this method, you must setup the game according to the game rules, so that
         the game is ready to be played.
     */
-    protected function setupNewGame( $players, $options = array() )
-    {    
+    protected function setupNewGame( $players, $options = array() ){    
         // Set the colors of the players with HTML color code
         // The default below is red/green/blue/orange/brown
         // The number of colors defined here must correspond to the maximum number of players allowed for the gams
@@ -67,8 +65,7 @@ class Volcano extends Table
         // Note: if you added some extra field on "player" table in the database (dbmodel.sql), you can initialize it there.
         $sql = "INSERT INTO player (player_id, player_color, player_canal, player_name, player_avatar) VALUES ";
         $values = array();
-        foreach( $players as $player_id => $player )
-        {
+        foreach( $players as $player_id => $player ){
             $color = array_shift( $default_colors );
             $values[] = "('".$player_id."','$color','".$player['player_canal']."','".addslashes( $player['player_name'] )."','".addslashes( $player['player_avatar'] )."')";
         }
@@ -87,13 +84,34 @@ class Volcano extends Table
         //self::initStat( 'table', 'table_teststat1', 0 );    // Init a table statistics
         //self::initStat( 'player', 'player_teststat1', 0 );  // Init a player statistics (for all players)
 
-        // TODO: setup the initial game situation here
-       
-
-        // Activate first player (which is in general a good idea :) )
-        $this->activeNextPlayer();
+		/////////////////////////////////////////////////
+		// Build up one big SQL command for all pieces //
+		/////////////////////////////////////////////////
+		$sql = 'INSERT INTO Pieces (color,pips,x,y,z) VALUES (';
+		for($x=0;$x<5;$x++){
+            $color = $x; // Color = x for testing
+			for($y=0;$y<5;$y++){
+				for($pips=1;$pips<=3;$pips++){
+					$z = $pips-1;
+                    $sql .= implode(',',[$color,$pips,$x,$y,$z]).'),(';
+				}
+			}
+		}
+		// Remove the final ',('
+		$sql=substr($sql,0,-2);
+		self::DbQuery($sql);
+          
+        // Setup stats
+        self::initStat('player','turns_number',0);
+        self::initStat('player','captures_large',0);
+        self::initStat('player','captures_medium',0);
+        self::initStat('player','captures_small',0);
+        self::initStat('player','trees_mixed',0);
+        self::initStat('player','trees_monochrome',0);
+        self::initStat('player','power_plays',0);
 
         /************ End of the game initialization *****/
+        $this->activeNextPlayer();
     }
 
     /*
@@ -105,18 +123,18 @@ class Volcano extends Table
         _ when the game starts
         _ when a player refreshes the game page (F5)
     */
-    protected function getAllDatas()
-    {
+    protected function getAllDatas(){
         $result = array();
     
         $current_player_id = self::getCurrentPlayerId();    // !! We must only return informations visible by this player !!
     
         // Get information about players
         // Note: you can retrieve some extra field you added for "player" table in "dbmodel.sql" if you need it.
-        $sql = "SELECT player_id id, player_score score FROM player ";
+        $sql = "SELECT player_id id, player_score score FROM player";
         $result['players'] = self::getCollectionFromDb( $sql );
   
-        // TODO: Gather all information about current game situation (visible by player $current_player_id).
+        $sql = "SELECT piece_id id, color,pips,x,y,z FROM Pieces";
+        $result['pieces'] = self::getCollectionFromDb( $sql );
   
         return $result;
     }
@@ -131,10 +149,7 @@ class Volcano extends Table
         This method is called each time we are in a game state with the "updateGameProgression" property set to true 
         (see states.inc.php)
     */
-    function getGameProgression()
-    {
-        // TODO: compute and return the game progression
-
+    function getGameProgression(){
         return 0;
     }
 
@@ -143,11 +158,9 @@ class Volcano extends Table
 //////////// Utility functions
 ////////////    
 
-    /*
-        In this space, you can put any utility methods useful for your game logic
-    */
-
-
+    function say($s){
+        self::notifyAllPlayers('notif_debug',$s,[]);
+    }
 
 //////////////////////////////////////////////////////////////////////////////
 //////////// Player actions
@@ -158,12 +171,51 @@ class Volcano extends Table
         (note: each method below must match an input method in volcano.action.php)
     */
 
+    function move_cap($cap_id,$x,$y){
+        /*
+        Verify that the id corresponds to a cap
+        Verify that the cap is adjacent to x,y
+        Verify that x,y is uncapped
+        Move cap to x,y
+        If it causes an erruption, enact it and end the turn
+        Notify players
+        */
+        $sql = "SELECT piece_id FROM Pieces
+            WHERE x=${x} AND y=${y}";
+        $result = self::getCollectionFromDb($sql);
+        $z = count($result);
+
+        $sql = "UPDATE Pieces
+            SET x=${x},y=${y},z=${z}
+            WHERE piece_id=${cap_id}";
+        self::DbQuery($sql);
+        
+        self::notifyAllPlayers(
+            'notif_move_cap',
+            clienttranslate("Moving cap ${cap_id} to (${x},${y},${z})"),
+			[
+                'cap_id' => $cap_id,
+                'x' => $x,
+                'y' => $y,
+                'z' => $z
+			]
+        );
+    }
+
+    function act_power_play($piece_id,$x,$y){
+        /*
+        Verify player has the piece
+        Ensure that space isn't capped
+        Put piece onto that space
+        Notify players
+        */
+    }
+
     /*
     
     Example:
 
-    function playCard( $card_id )
-    {
+    function playCard( $card_id ){
         // Check that this is the player's turn and that it is a "possible action" at this game state (see states.inc.php)
         self::checkAction( 'playCard' ); 
         
@@ -189,6 +241,10 @@ class Volcano extends Table
 //////////// Game state arguments
 ////////////
 
+    function args_after_move_cap(){
+    }
+    function args_after_power_play(){
+    }
     /*
         Here, you can create methods defined as "game state arguments" (see "args" property in states.inc.php).
         These methods function is to return some additional information that is specific to the current
@@ -199,8 +255,7 @@ class Volcano extends Table
     
     Example for game state "MyGameState":
     
-    function argMyGameState()
-    {
+    function argMyGameState(){
         // Get some values from the current game situation in database...
     
         // return values:
@@ -215,24 +270,10 @@ class Volcano extends Table
 //////////////////////////////////////////////////////////////////////////////
 //////////// Game state actions
 ////////////
-
-    /*
-        Here, you can create methods defined as "game state actions" (see "action" property in states.inc.php).
-        The action method of state X is called everytime the current game state is set to X.
-    */
-    
-    /*
-    
-    Example for game state "MyGameState":
-
-    function stMyGameState()
-    {
-        // Do some stuff ...
-        
-        // (very often) go to another gamestate
-        $this->gamestate->nextState( 'some_gamestate_transition' );
-    }    
-    */
+    function st_after_move_cap(){
+    }
+    function st_after_power_play(){
+    }
 
 //////////////////////////////////////////////////////////////////////////////
 //////////// Zombie
@@ -251,12 +292,11 @@ class Volcano extends Table
         you must _never_ use getCurrentPlayerId() or getCurrentPlayerName(), otherwise it will fail with a "Not logged" error message. 
     */
 
-    function zombieTurn( $state, $active_player )
-    {
+    function zombieTurn( $state, $active_player ){
     	$statename = $state['name'];
     	
-        if ($state['type'] === "activeplayer") {
-            switch ($statename) {
+        if ($state['type'] === "activeplayer"){
+            switch ($statename){
                 default:
                     $this->gamestate->nextState( "zombiePass" );
                 	break;
@@ -265,7 +305,7 @@ class Volcano extends Table
             return;
         }
 
-        if ($state['type'] === "multipleactiveplayer") {
+        if ($state['type'] === "multipleactiveplayer"){
             // Make sure player is in a non blocking status for role turn
             $this->gamestate->setPlayerNonMultiactive( $active_player, '' );
             
@@ -290,8 +330,7 @@ class Volcano extends Table
     
     */
     
-    function upgradeTableDb( $from_version )
-    {
+    function upgradeTableDb( $from_version ){
         // $from_version is the current version of this game database, in numerical form.
         // For example, if the game was running with a release of your game named "140430-1345",
         // $from_version is equal to 1404301345

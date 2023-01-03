@@ -73,6 +73,7 @@ $machinestates = array(
     3 => array(
         'name' => 'after_move_cap',
         'type' => 'game',
+        'args' => 'args_after_move_cap',
         'action' => 'st_after_move_cap',
         'transitions' => array('trans_player_turn' => 2, 'trans_gameEnd' => 99)
     ),
@@ -80,6 +81,7 @@ $machinestates = array(
     4 => array(
         'name' => 'after_power_play',
         'type' => 'game',
+        'args' => 'args_after_power_play',
         'action' => 'st_after_power_play',
         'transitions' => array('trans_player_turn' => 2)
     ),

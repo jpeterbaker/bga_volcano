@@ -55,41 +55,47 @@ $stats_type = array(
         "turns_number" => array("id"=> 10,
                     "name" => totranslate("Number of turns"),
                     "type" => "int" ),
-
-/*
-        Examples:
-
-
-        "table_teststat1" => array(   "id"=> 10,
-                                "name" => totranslate("table test stat 1"), 
-                                "type" => "int" ),
-                                
-        "table_teststat2" => array(   "id"=> 11,
-                                "name" => totranslate("table test stat 2"), 
-                                "type" => "float" )
-*/  
     ),
     
     // Statistics existing for each player
     "player" => array(
 
-        "turns_number" => array("id"=> 10,
-                    "name" => totranslate("Number of turns"),
-                    "type" => "int" ),
-    
-/*
-        Examples:    
-        
-        
-        "player_teststat1" => array(   "id"=> 10,
-                                "name" => totranslate("player test stat 1"), 
-                                "type" => "int" ),
-                                
-        "player_teststat2" => array(   "id"=> 11,
-                                "name" => totranslate("player test stat 2"), 
-                                "type" => "float" )
+        "turns_number" => array(
+            "id"=> 10,
+            "name" => totranslate("Number of turns"),
+            "type" => "int"
+        ),
 
-*/    
+        "captures_large" => array(
+            "id"=> 11,
+            "name" => totranslate("Large pieces captured"), 
+            "type" => "int"
+        ),
+        "captures_medium" => array(
+            "id"=> 12,
+            "name" => totranslate("Medium pieces captured"), 
+            "type" => "int"
+        ),
+        "captures_small" => array(
+            "id"=> 13,
+            "name" => totranslate("Small pieces captured"), 
+            "type" => "int"
+        ),
+        "trees_mixed" => array(
+            "id"=> 14,
+            "name" => totranslate("Mixed-color trios captured"), 
+            "type" => "int"
+        ),
+        "trees_monochrome" => array(
+            "id"=> 15,
+            "name" => totranslate("Monochrome trios captured"), 
+            "type" => "int"
+        ),
+        "power_plays" => array(
+            "id"=> 16,
+            "name" => totranslate("Pieces returned"), 
+            "type" => "int"
+        ),
     )
 
 );
