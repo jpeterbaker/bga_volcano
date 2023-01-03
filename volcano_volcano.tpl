@@ -13,47 +13,52 @@
 <!-- Placeholder interface for developing backend -->
 <table id='VOLtemp_display'>
     <tr>
-        <td id='VOLcell_0_0' class='VOLspace'></td>
-        <td id='VOLcell_1_0' class='VOLspace'></td>
-        <td id='VOLcell_2_0' class='VOLspace'></td>
-        <td id='VOLcell_3_0' class='VOLspace'></td>
-        <td id='VOLcell_4_0' class='VOLspace'></td>
-    </tr>                
-    <tr>                 
-        <td id='VOLcell_0_1' class='VOLspace'></td>
-        <td id='VOLcell_1_1' class='VOLspace'></td>
-        <td id='VOLcell_2_1' class='VOLspace'></td>
-        <td id='VOLcell_3_1' class='VOLspace'></td>
-        <td id='VOLcell_4_1' class='VOLspace'></td>
-    </tr>                
-    <tr>                 
-        <td id='VOLcell_0_2' class='VOLspace'></td>
-        <td id='VOLcell_1_2' class='VOLspace'></td>
-        <td id='VOLcell_2_2' class='VOLspace'></td>
-        <td id='VOLcell_3_2' class='VOLspace'></td>
-        <td id='VOLcell_4_2' class='VOLspace'></td>
-    </tr>                
-    <tr>                 
-        <td id='VOLcell_0_3' class='VOLspace'></td>
-        <td id='VOLcell_1_3' class='VOLspace'></td>
-        <td id='VOLcell_2_3' class='VOLspace'></td>
-        <td id='VOLcell_3_3' class='VOLspace'></td>
-        <td id='VOLcell_4_3' class='VOLspace'></td>
-    </tr>                
-    <tr>                 
-        <td id='VOLcell_0_4' class='VOLspace'></td>
-        <td id='VOLcell_1_4' class='VOLspace'></td>
-        <td id='VOLcell_2_4' class='VOLspace'></td>
-        <td id='VOLcell_3_4' class='VOLspace'></td>
-        <td id='VOLcell_4_4' class='VOLspace'></td>
+        <td class='VOLcell' id='VOLcell_0_0' x='0' y='0'></td>
+        <td class='VOLcell' id='VOLcell_1_0' x='1' y='0'></td>
+        <td class='VOLcell' id='VOLcell_2_0' x='2' y='0'></td>
+        <td class='VOLcell' id='VOLcell_3_0' x='3' y='0'></td>
+        <td class='VOLcell' id='VOLcell_4_0' x='4' y='0'></td>
+    </tr>                                
+    <tr>                                 
+        <td class='VOLcell' id='VOLcell_0_1' x='0' y='1'></td>
+        <td class='VOLcell' id='VOLcell_1_1' x='1' y='1'></td>
+        <td class='VOLcell' id='VOLcell_2_1' x='2' y='1'></td>
+        <td class='VOLcell' id='VOLcell_3_1' x='3' y='1'></td>
+        <td class='VOLcell' id='VOLcell_4_1' x='4' y='1'></td>
+    </tr>                                
+    <tr>                                 
+        <td class='VOLcell' id='VOLcell_0_2' x='0' y='2'></td>
+        <td class='VOLcell' id='VOLcell_1_2' x='1' y='2'></td>
+        <td class='VOLcell' id='VOLcell_2_2' x='2' y='2'></td>
+        <td class='VOLcell' id='VOLcell_3_2' x='3' y='2'></td>
+        <td class='VOLcell' id='VOLcell_4_2' x='4' y='2'></td>
+    </tr>                                
+    <tr>                                 
+        <td class='VOLcell' id='VOLcell_0_3' x='0' y='3'></td>
+        <td class='VOLcell' id='VOLcell_1_3' x='1' y='3'></td>
+        <td class='VOLcell' id='VOLcell_2_3' x='2' y='3'></td>
+        <td class='VOLcell' id='VOLcell_3_3' x='3' y='3'></td>
+        <td class='VOLcell' id='VOLcell_4_3' x='4' y='3'></td>
+    </tr>                                
+    <tr>                                 
+        <td class='VOLcell' id='VOLcell_0_4' x='0' y='4'></td>
+        <td class='VOLcell' id='VOLcell_1_4' x='1' y='4'></td>
+        <td class='VOLcell' id='VOLcell_2_4' x='2' y='4'></td>
+        <td class='VOLcell' id='VOLcell_3_4' x='3' y='4'></td>
+        <td class='VOLcell' id='VOLcell_4_4' x='4' y='4'></td>
     </tr>
 </table>
 
 <script type="text/javascript">
 
 // Javascript HTML templates
-var jstpl_piece = "<div class='VOLpiece' id='VOLpiece_${piece_id}' ptype='${colornum}_${pipsnum}' VOLz='${z}'>color ${colornum} size ${pipsnum}</div>";
 
-</script>  
+// Piece
+var jstpl_piece = "<div class='VOLpiece' id='VOLpiece_${piece_id}' VOLcolor='${colornum}' VOLpips='${pipsnum}' VOLz='${z}'>${pipsnum}</div>";
+// Capture table
+var jstpl_captures = "<div class='VOLcaptures' id='VOLcaptures_${player_id}'><div>Captures of ${player_name}</div><div class='VOLrow_1 VOLcap_row'></div><div class='VOLrow_2 VOLcap_row'></div><div class='VOLrow_3 VOLcap_row'></div></div>";
+
+</script> 
 
 {OVERALL_GAME_FOOTER}
+

@@ -38,13 +38,14 @@ class action_volcano extends APP_GameAction{
     public function act_move_cap(){
         self::setAjaxMode();
 
-        // Piece ID of the cap
-        $cap_id = self::getArg('cap_id',AT_posint,true);
+        // Origin space
+        $oldx = self::getArg('oldx',AT_posint,true);
+        $oldy = self::getArg('oldy',AT_posint,true);
         // Destination space
         $x = self::getArg('x',AT_posint,true);
         $y = self::getArg('y',AT_posint,true);
 
-        $this->game->move_cap($cap_id,$x,$y);
+        $this->game->move_cap($oldx,$oldy,$x,$y);
 
         self::ajaxResponse();
     }

@@ -70,7 +70,7 @@ class Volcano extends Table
             $values[] = "('".$player_id."','$color','".$player['player_canal']."','".addslashes( $player['player_name'] )."','".addslashes( $player['player_avatar'] )."')";
         }
         $sql .= implode( $values, ',' );
-        self::DbQuery( $sql );
+        self::DbQuery($sql);
         self::reattributeColorsBasedOnPreferences( $players, $gameinfos['player_colors'] );
         self::reloadPlayersBasicInfos();
         
@@ -84,13 +84,13 @@ class Volcano extends Table
         //self::initStat( 'table', 'table_teststat1', 0 );    // Init a table statistics
         //self::initStat( 'player', 'player_teststat1', 0 );  // Init a player statistics (for all players)
 
-		/////////////////////////////////////////////////
-		// Build up one big SQL command for all pieces //
-		/////////////////////////////////////////////////
+		////////////////////////////////////////////////////////
+		// Build up one big SQL command for all nested pieces //
+		////////////////////////////////////////////////////////
 		$sql = 'INSERT INTO Pieces (color,pips,x,y,z) VALUES (';
 		for($x=0;$x<5;$x++){
-            $color = $x; // Color = x for testing
 			for($y=0;$y<5;$y++){
+                $color = bga_rand(1,9);
 				for($pips=1;$pips<=3;$pips++){
 					$z = $pips-1;
                     $sql .= implode(',',[$color,$pips,$x,$y,$z]).'),(';
@@ -100,8 +100,28 @@ class Volcano extends Table
 		// Remove the final ',('
 		$sql=substr($sql,0,-2);
 		self::DbQuery($sql);
+
+        ////////////////
+        // Setup caps //
+        ////////////////
+        // Shuffle the squares
+        $squares = range(0,24);
+        shuffle($squares);
+		$sql = 'INSERT INTO Pieces (color,pips,x,y,z) VALUES (';
+        // Put caps on the first 5
+        for($i=0;$i<5;$i++){
+            $k = $squares[$i];
+            $x = $k%5;
+            $y = intdiv($k,5);
+            $sql .= implode(',',[0,1,$x,$y,3]).'),(';
+        }
+		// Remove the final ',('
+		$sql=substr($sql,0,-2);
+		self::DbQuery($sql);
           
-        // Setup stats
+        /////////////////
+        // Setup stats //
+        /////////////////
         self::initStat('player','turns_number',0);
         self::initStat('player','captures_large',0);
         self::initStat('player','captures_medium',0);
@@ -126,14 +146,9 @@ class Volcano extends Table
     protected function getAllDatas(){
         $result = array();
     
-        $current_player_id = self::getCurrentPlayerId();    // !! We must only return informations visible by this player !!
-    
-        // Get information about players
-        // Note: you can retrieve some extra field you added for "player" table in "dbmodel.sql" if you need it.
-        $sql = "SELECT player_id id, player_score score FROM player";
-        $result['players'] = self::getCollectionFromDb( $sql );
+        // result['players'] seems to get populated automatically with abbreviated column names
   
-        $sql = "SELECT piece_id id, color,pips,x,y,z FROM Pieces";
+        $sql = "SELECT * FROM Pieces";
         $result['pieces'] = self::getCollectionFromDb( $sql );
   
         return $result;
@@ -159,7 +174,95 @@ class Volcano extends Table
 ////////////    
 
     function say($s){
+        // For JSON like things, use json_encode($x)
         self::notifyAllPlayers('notif_debug',$s,[]);
+    }
+    function array_key_first($x){
+        foreach($x as $key=>$value)
+            return $key;
+        return NULL;
+    }
+    function on_board($x,$y){
+        return $x>=0 && $x<5 && $y>=0 && $y<5;
+    }
+    function capped($x,$y){
+        $sql = "SELECT piece_id FROM Pieces
+            WHERE x=${x} AND y=${y} AND color=0";
+        $result = self::getCollectionFromDb($sql);
+        return count($result) > 0;
+    }
+    // Count pieces in stack
+    function get_height($x,$y){
+        $sql = "SELECT piece_id FROM Pieces
+            WHERE x=${x} AND y=${y}";
+        $result = self::getCollectionFromDb($sql);
+        return count($result);
+    }
+
+    function flow($x0,$y0,$z0,$x1,$y1){
+        $z1 = $this->get_height($x1,$y1);
+//        $this->say("flowing from ${x0} ${y0} ${z0} to ${x1} ${y1} ${z1}");
+        // The piece that gets landed on
+        $piece1 = $this->top($x1,$y1);
+        $piece = $this->top($x0,$y0);
+
+        $piece_id  = $piece['piece_id'];
+        $sql = "UPDATE Pieces
+            SET x=${x1},y=${y1},z=${z1}
+            WHERE piece_id=${piece_id}";
+        self::DbQuery($sql);
+        self::notifyAllPlayers(
+            'notif_flow',
+            '',
+			[
+                'piece_id' => $piece_id,
+                'x'      => $x1,
+                'y'      => $y1,
+                'z'      => $z1
+			]
+        );
+        ///////////////////////
+        // Check for capture //
+        ///////////////////////
+        if(!is_null($piece1) && $piece['pips'] == $piece1['pips'])
+            $this->capture($piece);
+    }
+
+    function capture($piece){
+        $piece_id = $piece['piece_id'];
+//        $piece_str = $this->piece_str($piece);
+        $x = $piece['x'];
+        $y = $piece['y'];
+        $player_id = $this->getActivePlayerId();
+        $sql = "UPDATE Pieces
+            SET x=NULL,y=NULL,z=NULL,owner_id=${player_id}
+            WHERE piece_id=${piece_id}";
+        self::DbQuery($sql);
+        self::notifyAllPlayers(
+            'notif_capture',
+            clienttranslate('${player_name} captures a piece from (${x},${y})'),
+			[
+                'player_name' => $this->getActivePlayerName(),
+                'player_id'   => $this->getActivePlayerId(),
+                'piece_id'    => $piece_id,
+                'x'           => $x,
+                'y'           => $y
+			]
+        );
+    }
+
+    // DB row of top piece on space x,y (NULL if none)
+    // To avoid an extra query, provide the z coordinate if known
+    function top($x,$y,$z=NULL){
+        if(is_null($z))
+            $z = $this->get_height($x,$y) - 1;
+        $sql = "SELECT * from Pieces
+            WHERE x=${x} AND y=${y} AND z=${z}";
+        $result = self::getCollectionFromDb($sql);
+        if(count($result)==0){
+            return NULL;
+        }
+        return $result[$this->array_key_first($result)];
     }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -171,35 +274,93 @@ class Volcano extends Table
         (note: each method below must match an input method in volcano.action.php)
     */
 
-    function move_cap($cap_id,$x,$y){
-        /*
-        Verify that the id corresponds to a cap
-        Verify that the cap is adjacent to x,y
-        Verify that x,y is uncapped
-        Move cap to x,y
-        If it causes an erruption, enact it and end the turn
-        Notify players
-        */
-        $sql = "SELECT piece_id FROM Pieces
-            WHERE x=${x} AND y=${y}";
-        $result = self::getCollectionFromDb($sql);
-        $z = count($result);
+    function move_cap($x0,$y0,$x1,$y1){
+        // Check that destination is on board
+        if(!$this->on_board($x1,$y1)){
+			throw new BgaVisibleSystemException(
+				self::_('That space is not on the board.')
+            );
+        }
 
+        // Check move distance
+        $dx = $x1-$x0;
+        $dy = $y1-$y0;
+        $dist = max(abs($dx),abs($dy));
+        if($dist!=1){
+			throw new BgaUserException(
+				self::_('Caps must move exactly 1 space.')
+            );
+        }
+
+        // Get moving cap's id
+        $sql = "SELECT piece_id FROM Pieces
+            WHERE x=${x0} AND y=${y0} AND color=0";
+        $result = self::getCollectionFromDb($sql);
+        if(count($result)==0){
+			throw new BgaUserException(
+				self::_('There must be a cap on origin space.')
+            );
+        }
+
+        $cap_id = $this->array_key_first($result);
+
+        // Ensure desitation has no cap
+        $sql = "SELECT piece_id FROM Pieces
+            WHERE x=${x1} AND y=${y1} AND color=0";
+        $result = self::getCollectionFromDb($sql);
+        if(count($result)!=0){
+			throw new BgaUserException(
+				self::_('Destination space must not have cap.')
+            );
+        }
+
+        $z1 = $this->get_height($x1,$y1);
+
+        // Update DB with cap movement
         $sql = "UPDATE Pieces
-            SET x=${x},y=${y},z=${z}
+            SET x=${x1},y=${y1},z=${z1}
             WHERE piece_id=${cap_id}";
         self::DbQuery($sql);
         
         self::notifyAllPlayers(
             'notif_move_cap',
-            clienttranslate("Moving cap ${cap_id} to (${x},${y},${z})"),
+            clienttranslate('${player_name} moves a cap from (${x0},${y0}) to (${x},${y})'),
 			[
-                'cap_id' => $cap_id,
-                'x' => $x,
-                'y' => $y,
-                'z' => $z
+                'player_name' => $this->getActivePlayerName(),
+                'piece_id'    => $cap_id,
+                'x0'          => $x0,
+                'y0'          => $y0,
+                'x'          => $x1,
+                'y'          => $y1,
+                'z'          => $z1
+
 			]
         );
+
+        ////////////////////
+        // Eruption check //
+        ////////////////////
+        $destx = $x1;
+        $desty = $y1;
+        $source_height = $this->get_height($x0,$y0);
+        //Flow lava while it makes sense
+        while($source_height>0){
+            $destx += $dx;
+            $desty += $dy;
+
+            // Off the board?
+            if(!$this->on_board($destx,$desty)){
+                break;
+            }
+            // Capped?
+            if($this->capped($destx,$desty)){
+                break;
+            }
+
+            $this->flow($x0,$y0,$source_height-1,$destx,$desty);
+
+            $source_height--;
+        }
     }
 
     function act_power_play($piece_id,$x,$y){

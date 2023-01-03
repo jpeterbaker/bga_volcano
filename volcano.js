@@ -29,26 +29,67 @@ function (dojo, declare) {
 
 	},
 
-	setup: function( gamedatas ) {
-		///////////////////////////////////////
-		// Make interface reflect game state //
-		///////////////////////////////////////
-		var piece_id,cell,html;
+	setup: function(gamedatas) {
+        ////////////////////////
+        // Make capture areas //
+        ////////////////////////
+//        console.log(gamedatas);
+        var board = document.getElementById('VOLtemp_display');
+        var player_id,name,html;
+        for(player_id in gamedatas.players){
+            name = gamedatas.players[player_id].name;
+			html = this.format_block(
+				'jstpl_captures',
+				{
+					player_id: player_id,
+					player_name: name
+				}
+			);
+            dojo.place(html,board,'after');
+        }
+
+		//////////////////////////////////
+		// Put pieces on correct spaces //
+		//////////////////////////////////
+		var piece_id,cell;
 		for(piece_id in gamedatas.pieces) {
 			piece = gamedatas.pieces[piece_id];
-			cell = document.getElementById('VOLcell_'+piece.x+'_'+piece.y);
+            if(piece.z == null)
+                piece.z = 'none';
 			html = this.format_block(
 				'jstpl_piece',
 				{
-					piece_id: piece.id,
+					piece_id: piece_id,
 					colornum: piece.color,
 					pipsnum:  piece.pips,
 					z      :  piece.z
 				}
 			);
-			dojo.place(html,cell,piece.z);
+            if(piece.owner_id != null){
+                // Put it on the board for starters
+                // It needs to exist for stow to work
+                dojo.place(html,board,'after');
+                this.stow(piece.piece_id,piece.owner_id);
+                continue;
+            }
+			cell = this.get_space(piece.x,piece.y);
+			dojo.place(html,cell);
 		}
-		this.connectClass('VOLpiece','onclick','piece_clicked');
+        //////////////////////
+        // Order the pieces //
+        //////////////////////
+        var x,y,children,child;
+        for(cell of dojo.query('.VOLcell')){
+                // Make an array of the children
+                children = [...cell.children];
+                children.sort(this.compare_z);
+                // Place the children in order
+                for(child of children){
+                    dojo.place(child,cell,'first');
+                }
+        }
+
+		this.connectClass('VOLcell','onclick','cell_clicked');
 
 		this.selected=null;
 
@@ -56,6 +97,16 @@ function (dojo, declare) {
 		this.setupNotifications();
 	},
 
+    // piece is an object provided by server
+    // Place corresponding node in owner's collection
+	stow: function(piece_id,owner_id) {
+        var node = this.get_piece(piece_id);
+        var pips = this.get_size(node);
+        var collection = document.getElementById('VOLcaptures_'+owner_id);
+        var row = dojo.query('.VOLrow_'+pips,collection)[0];
+        dojo.place(node,row);
+    },
+    
 
 	///////////////////////////////////////////////////
 	//// Game & client states
@@ -64,8 +115,6 @@ function (dojo, declare) {
 	//                  You can use this method to perform some user interface changes at this moment.
 	//
 	onEnteringState: function( stateName, args ) {
-		console.log( 'Entering state: '+stateName );
-
 		switch( stateName ) {
 
 		/* Example:
@@ -88,8 +137,6 @@ function (dojo, declare) {
 	//                 You can use this method to perform some user interface changes at this moment.
 	//
 	onLeavingState: function( stateName ) {
-		console.log( 'Leaving state: '+stateName );
-
 		switch( stateName ) {
 
 		/* Example:
@@ -112,8 +159,6 @@ function (dojo, declare) {
 	//                        action status bar (ie: the HTML links in the status bar).
 	//
 	onUpdateActionButtons: function( stateName, args ) {
-		console.log( 'onUpdateActionButtons: '+stateName );
-
 		if( this.isCurrentPlayerActive() ) {
 			switch( stateName ) {
 /*
@@ -138,11 +183,14 @@ function (dojo, declare) {
 	get_piece_id: function(node){
 		return node.id.split('_')[1];
 	},
+    get_piece: function(piece_id){
+        return document.getElementById('VOLpiece_'+piece_id);
+    },
 
-	get_space: function(node){
+	get_resting_space: function(node){
 		// Get the space this piece is on
 		var par = node;
-		while(!dojo.hasClass(par,'VOLspace')){
+		while(!dojo.hasClass(par,'VOLcell')){
 			par = par.parentNode;
 			if(par === undefined || par.id === undefined){
 				return null;
@@ -150,19 +198,19 @@ function (dojo, declare) {
 		}
 		return par;
 	},
+    get_space: function(x,y){
+        return document.getElementById('VOLcell_'+x+'_'+y);
+    },
 
 	get_xy: function(space){
 		return space.id.split('_').slice(1);
 	},
 	get_color: function(piecenode){
-		return parseInt(piecenode.getAttribute('ptype').split('_')[0]);
+		return parseInt(piecenode.getAttribute('VOLcolor'));
 	},
 	get_size: function(piecenode){
-		return parseInt(piecenode.getAttribute('ptype').split('_')[1]);
+		return parseInt(piecenode.getAttribute('VOLpips'));
 	},
-    get_piece: function(piece_id){
-        return document.getElementById('VOLpiece_'+piece_id);
-    },
 
     ajaxcallwrapper: function(action, args, err_handler) {
         // this allows to skip args parameter for action which do not require them
@@ -186,29 +234,43 @@ function (dojo, declare) {
         }
     },
 
+    // Comparison function for ordering piece nodes by z value
+    compare_z: function(a,b){
+        return Math.sign(a.getAttribute('VOLz')-b.getAttribute('VOLz'));
+//        var result = Math.floor(Math.random()*2)*2 - 1;
+//        return result;
+    },
+
 	///////////////////////////////////////////////////
 	//// Player's action
 
-	piece_clicked: function(evt){
+	cell_clicked: function(evt){
 		evt.preventDefault();
-		var node = evt.currentTarget;
+		var space = evt.currentTarget;
 		if(this.selected==null){
-            // Piece has just been selected
-			this.selected=node;
-			console.log('Selected',node);
+            // Cell has just been selected
+            // But ignore selection if cell is empty
+            if(space.children.length>0){
+                this.selected=space;
+                dojo.addClass(this.selected,'VOLselected');
+            }
 			return;
 		}
         // Selected piece should be moved to this square
-		var xy = this.get_xy(this.get_space(node));
-		var id = this.get_piece_id(this.selected);
+		var xy = this.get_xy(space);
+        var piece = this.selected.children[0];
+		var id = this.get_piece_id(piece);
+        var oldxy = this.get_xy(this.get_resting_space(piece));
         this.ajaxcallwrapper(
             'act_move_cap',
             {
-                cap_id: id,
+                oldx: oldxy[0],
+                oldy: oldxy[1],
                 x: xy[0],
                 y: xy[1]
             }
         );
+        dojo.removeClass(this.selected,'VOLselected');
         this.selected=null;
 	},
 
@@ -233,23 +295,35 @@ function (dojo, declare) {
 		//
 		dojo.subscribe('notif_debug',this,'ignore_notif');
 
-		dojo.subscribe('notif_move_cap',this,'move_cap_from_notif');
+		dojo.subscribe('notif_move_cap',this,'move_from_notif');
+		dojo.subscribe('notif_flow',this,'move_from_notif');
+		dojo.subscribe('notif_capture',this,'capture_from_notif');
+
 		dojo.subscribe('notif_power_play',this,'power_play_from_notif');
 	},
 
 	// Ignore the notification. The text will simply appear in the log
 	ignore_notif: function(notif){},
 
-	move_cap_from_notif: function(notif){
-        var cap_id = notif.args.cap_id;
+	move_from_notif: function(notif){
+        var piece_id = notif.args.piece_id;
         var x = notif.args.x;
         var y = notif.args.y;
         var z = notif.args.z;
-        var piece = this.get_piece(cap_id);
-        var space = document.getElementById('VOLcell_'+x+'_'+y);
-        dojo.place(piece,space);
-        piece.Volz = z;
+
+        var piece = this.get_piece(piece_id);
+        var space = this.get_space(x,y);
+        dojo.place(piece,space,'first');
+        piece.setAttribute('VOLz',z);
     },
+
+    capture_from_notif: function(notif){
+        var piece_id = notif.args.piece_id;
+        var player_id = notif.args.player_id;
+        this.stow(piece_id,player_id);
+    },
+
+    // Put a piece back on the board
 	power_play_from_notif: function(notif){
         var piece_id = notif.args.piece_id;
         var x = notif.args.x;

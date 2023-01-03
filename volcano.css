@@ -13,10 +13,76 @@
  *
  */
 
-td{
-    border:1px solid black;
+#VOLtemp_display{
+    display:inline-table
 }
-tr{
+
+.VOLcell{
+    cursor:pointer;
+    padding:5px;
+    border:2px solid black;
     height:20px;
+}
+
+.VOLcell.VOLselected{
+    outline:4px dashed chartreuse
+}
+
+.VOLpiece{
+    font-size:20px;
+    font-weight:900;
+    padding:5px;
+    width:30px;
+    text-align:center
+}
+
+.VOLcaptures{
+    display:inline-block
+}
+
+/* Captured pieces don't get their own line */
+.VOLcaptures .VOLpiece{
+    display:inline-block
+}
+
+[VOLcolor='0']{
+    background-color:black;
+    color:white
+}
+[VOLcolor='1']{
+    background-color:red;
+    color:white
+}
+[VOLcolor='2']{
+    background-color:orange;
+    color:black
+}
+[VOLcolor='3']{
+    background-color:yellow;
+    color:black
+}
+[VOLcolor='4']{
+    background-color:green;
+    color:white
+}
+[VOLcolor='5']{
+    background-color:cyan;
+    color:black
+}
+[VOLcolor='6']{
+    background-color:blue;
+    color:white
+}
+[VOLcolor='7']{
+    background-color:purple;
+    color:white
+}
+[VOLcolor='8']{
+    background-color:gray;
+    color:white
+}
+[VOLcolor='9']{
+    background-color:white;
+    color:black
 }
 

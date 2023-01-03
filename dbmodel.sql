@@ -22,11 +22,6 @@ CREATE TABLE IF NOT EXISTS `Pieces` (
      `z` tinyint UNSIGNED DEFAULT NULL,
      -- Owning player (null piece is on the board)
      -- Corresponds to player.player_id
-     `owner_id` int UNSIGNED DEFAULT NULL,
-     -- Saved values for reverting to start of turn
-     `saved_x` tinyint UNSIGNED DEFAULT NULL,
-     `saved_y` tinyint UNSIGNED DEFAULT NULL,
-     `saved_z` tinyint UNSIGNED DEFAULT NULL,
-     `saved_owner_id` int UNSIGNED DEFAULT NULL
+     `owner_id` int UNSIGNED DEFAULT NULL
 ) ENGINE=InnoDB;
 
