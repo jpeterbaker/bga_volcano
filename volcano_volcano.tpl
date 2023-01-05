@@ -57,6 +57,11 @@
 var jstpl_piece = "<div class='VOLpiece' id='VOLpiece_${piece_id}' VOLcolor='${colornum}' VOLpips='${pipsnum}' VOLz='${z}'>${pipsnum}</div>";
 // Capture table
 var jstpl_captures = "<div class='VOLcaptures' id='VOLcaptures_${player_id}'><div>Captures of ${player_name}</div><div class='VOLrow_1 VOLcap_row'></div><div class='VOLrow_2 VOLcap_row'></div><div class='VOLrow_3 VOLcap_row'></div></div>";
+// Score table
+var jstpl_scores = "<div class='VOLscores'>"+
+	"<div><span id='VOLtrees_${player_id}'>0</span> trios</div>"+
+	"<div><span id='VOLpures_${player_id}'>0</span> monochrome trios</div>"+
+	"</div>";
 
 </script> 
 

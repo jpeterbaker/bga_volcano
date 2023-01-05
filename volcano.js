@@ -35,9 +35,10 @@ function (dojo, declare) {
         ////////////////////////
 //        console.log(gamedatas);
         var board = document.getElementById('VOLtemp_display');
-        var player_id,name,html;
+        var player_id,player,name,html;
         for(player_id in gamedatas.players){
-            name = gamedatas.players[player_id].name;
+            player = gamedatas.players[player_id];
+            name = player.name;
 			html = this.format_block(
 				'jstpl_captures',
 				{
@@ -46,6 +47,23 @@ function (dojo, declare) {
 				}
 			);
             dojo.place(html,board,'after');
+        }
+        //////////////////////
+        // Make score areas //
+        //////////////////////
+        for(player_id in gamedatas.players){
+            player = gamedatas.players[player_id];
+            board = document.getElementById('player_board_'+player_id);
+			html = this.format_block(
+				'jstpl_scores',
+				{
+					player_id: player_id
+				}
+			);
+            var x=dojo.place(html,board,'last');
+            console.log('board',board);
+            console.log('x',x);
+            this.update_scores(player_id,player.trees,player.pures);
         }
 
 		//////////////////////////////////
@@ -111,45 +129,18 @@ function (dojo, declare) {
 	///////////////////////////////////////////////////
 	//// Game & client states
 
-	// onEnteringState: this method is called each time we are entering into a new game state.
-	//                  You can use this method to perform some user interface changes at this moment.
-	//
-	onEnteringState: function( stateName, args ) {
-		switch( stateName ) {
-
-		/* Example:
-
-		case 'myGameState':
-
-			// Show some HTML block at this game state
-			dojo.style( 'my_html_block_id', 'display', 'block' );
-
-			break;
-	   */
-
-
-		case 'dummmy':
-			break;
+	onEnteringState: function(stateName,args){
+        // Things added by args function on client side are in args.args
+		switch(stateName){
+            case 'after_eruption':
+                console.log(args);
+                this.update_scores(args.active_player,args.args.trees,args.args.pures);
+                break;
 		}
 	},
 
-	// onLeavingState: this method is called each time we are leaving a game state.
-	//                 You can use this method to perform some user interface changes at this moment.
-	//
 	onLeavingState: function( stateName ) {
 		switch( stateName ) {
-
-		/* Example:
-
-		case 'myGameState':
-
-			// Hide the HTML block we are displaying only during this game state
-			dojo.style( 'my_html_block_id', 'display', 'none' );
-
-			break;
-	   */
-
-
 		case 'dummmy':
 			break;
 		}
@@ -211,6 +202,17 @@ function (dojo, declare) {
 	get_size: function(piecenode){
 		return parseInt(piecenode.getAttribute('VOLpips'));
 	},
+
+    update_scores(player_id,trees,pures){
+        var span = document.getElementById('VOLtrees_'+player_id);
+        console.log('id and span');
+        console.log('VOLtrees_'+player_id);
+        console.log(span);
+        span.innerText = trees;
+        span = document.getElementById('VOLpures_'+player_id);
+        span.innerText = pures;
+    },
+
 
     ajaxcallwrapper: function(action, args, err_handler) {
         // this allows to skip args parameter for action which do not require them
@@ -277,15 +279,6 @@ function (dojo, declare) {
 	///////////////////////////////////////////////////
 	//// Reaction to cometD notifications
 
-	/*
-		setupNotifications:
-
-		In this method, you associate each of your game notifications with your local method to handle it.
-
-		Note: game notification names correspond to "notifyAllPlayers" and "notifyPlayer" calls in
-			  your volcano.game.php file.
-
-	*/
 	setupNotifications: function() {
 
 		// Example 2: standard notification handling + tell the
@@ -300,6 +293,8 @@ function (dojo, declare) {
 		dojo.subscribe('notif_capture',this,'capture_from_notif');
 
 		dojo.subscribe('notif_power_play',this,'power_play_from_notif');
+
+		dojo.subscribe('notif_end_game',this,'ignore_notif');
 	},
 
 	// Ignore the notification. The text will simply appear in the log

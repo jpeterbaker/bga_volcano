@@ -51,10 +51,9 @@ $stats_type = array(
 
     // Statistics global to table
     "table" => array(
-
         "turns_number" => array("id"=> 10,
-                    "name" => totranslate("Number of turns"),
-                    "type" => "int" ),
+        "name" => totranslate("Number of turns"),
+        "type" => "int" ),
     ),
     
     // Statistics existing for each player

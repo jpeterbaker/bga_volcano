@@ -8,6 +8,8 @@
 -- -----
 
 -- dbmodel.sql
+ALTER TABLE `player` ADD `trees` SMALLINT UNSIGNED DEFAULT 0,
+                     ADD `pures` SMALLINT UNSIGNED DEFAULT 0;
 
 CREATE TABLE IF NOT EXISTS `Pieces` (
      `piece_id` int NOT NULL PRIMARY KEY AUTO_INCREMENT,

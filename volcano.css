@@ -36,8 +36,13 @@
     text-align:center
 }
 
+.VOLscores{
+	margin-top:10px;
+}
+
 .VOLcaptures{
-    display:inline-block
+    display:inline-block;
+    border:2px solid black
 }
 
 /* Captured pieces don't get their own line */
@@ -84,5 +89,30 @@
 [VOLcolor='9']{
     background-color:white;
     color:black
+}
+
+/********************************
+Modifications to main BGA display
+********************************/
+
+/* Hide the dash that would be the player score in other games */
+.player_score_value{
+    display:none
+}
+/*
+Hide the star that would be by the player score in other games
+WARNING: The BGA rating form also uses .fa-star,
+         so make sure the selector is more specific
+*/
+.player_score>.fa-star{
+    display:none
+}
+/* Hide the dot that would separate the game score from the elo */
+.player_elo_wrap{
+    font-size:0px;
+}
+/* DON'T hide the children of the player_elo_wrap, like the elo score itself */
+.player_elo_wrap>*{
+    font-size:16px;
 }
 

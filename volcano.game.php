@@ -19,11 +19,40 @@
 
 require_once( APP_GAMEMODULE_PATH.'module/table/table.game.php' );
 
+function zeros($i,$j){
+    // Return a 2D array full of zeros with i,j as indices
+    $m = count($i);
+    $n = count($j);
+    $x = [];
+    foreach($i as $a){
+        $x[$a] = [];
+        foreach($j as $b){
+            $x[$a][$b] = 0;
+        }
+    }
+    return $x;
+}
 
-class Volcano extends Table
-{
-	function __construct( )
-	{
+function on_board($x,$y){
+    return $x>=0 && $x<5 && $y>=0 && $y<5;
+}
+
+// Check the up-to-four spaces orthogonally adjacent to x,y
+// for any that are of the given color
+function borders_same($board,$x,$y,$color){
+    for($d=-1 ; $d<2 ; $d+=2){
+        $x1 = $x+$d;
+        if(on_board($x1,$y) && $board[$x1][$y]==$color)
+            return true;
+        $y1 = $y+$d;
+        if(on_board($x,$y1) && $board[$x][$y1]==$color)
+            return true;
+    }
+    return false;
+}
+
+class Volcano extends Table {
+	function __construct( ) {
         // Your global variables labels:
         //  Here, you can assign labels to global variables you are using for this game.
         //  You can use any number of global variables with IDs between 10 and 99.
@@ -65,7 +94,7 @@ class Volcano extends Table
         // Note: if you added some extra field on "player" table in the database (dbmodel.sql), you can initialize it there.
         $sql = "INSERT INTO player (player_id, player_color, player_canal, player_name, player_avatar) VALUES ";
         $values = array();
-        foreach( $players as $player_id => $player ){
+        foreach($players as $player_id => $player){
             $color = array_shift( $default_colors );
             $values[] = "('".$player_id."','$color','".$player['player_canal']."','".addslashes( $player['player_name'] )."','".addslashes( $player['player_avatar'] )."')";
         }
@@ -76,49 +105,28 @@ class Volcano extends Table
         
         /************ Start the game initialization *****/
 
-        // Init global values with their initial values
-        //self::setGameStateInitialValue( 'my_first_global_variable', 0 );
-        
-        // Init game statistics
-        // (note: statistics used in this file must be defined in your stats.inc.php file)
-        //self::initStat( 'table', 'table_teststat1', 0 );    // Init a table statistics
-        //self::initStat( 'player', 'player_teststat1', 0 );  // Init a player statistics (for all players)
+        //self::setGameStateInitialValue('my_global_variable',0);
 
-		////////////////////////////////////////////////////////
-		// Build up one big SQL command for all nested pieces //
-		////////////////////////////////////////////////////////
-		$sql = 'INSERT INTO Pieces (color,pips,x,y,z) VALUES (';
-		for($x=0;$x<5;$x++){
-			for($y=0;$y<5;$y++){
-                $color = bga_rand(1,9);
-				for($pips=1;$pips<=3;$pips++){
-					$z = $pips-1;
-                    $sql .= implode(',',[$color,$pips,$x,$y,$z]).'),(';
-				}
-			}
-		}
-		// Remove the final ',('
-		$sql=substr($sql,0,-2);
-		self::DbQuery($sql);
-
-        ////////////////
-        // Setup caps //
-        ////////////////
-        // Shuffle the squares
-        $squares = range(0,24);
-        shuffle($squares);
-		$sql = 'INSERT INTO Pieces (color,pips,x,y,z) VALUES (';
-        // Put caps on the first 5
-        for($i=0;$i<5;$i++){
-            $k = $squares[$i];
-            $x = $k%5;
-            $y = intdiv($k,5);
-            $sql .= implode(',',[0,1,$x,$y,3]).'),(';
+        // Give players a few pieces to speed up testing
+        if(1){
+            $i=0;
+            $sql = 'INSERT INTO Pieces (color,pips,owner_id) VALUES (';
+            foreach($players as $player_id => $player){
+                for($pips=1;$pips<3;$pips++){
+                    for($color=2*$i+1;$color<2*$i+3;$color++){
+                        for($j=0;$j<3;$j++)
+                            $sql .= implode(',',[$color,$pips,$player_id]).'),(';
+                    }
+                }
+                $i++;
+            }
+            // Remove the final ',('
+            $sql=substr($sql,0,-2);
+            self::DbQuery($sql);
         }
-		// Remove the final ',('
-		$sql=substr($sql,0,-2);
-		self::DbQuery($sql);
-          
+
+        $this->fiesta_caldera_setup();
+
         /////////////////
         // Setup stats //
         /////////////////
@@ -134,40 +142,116 @@ class Volcano extends Table
         $this->activeNextPlayer();
     }
 
-    /*
-        getAllDatas: 
-        
-        Gather all informations about current game situation (visible by the current player).
-        
-        The method is called each time the game interface is displayed to a player, ie:
-        _ when the game starts
-        _ when a player refreshes the game page (F5)
-    */
     protected function getAllDatas(){
         $result = array();
     
         // result['players'] seems to get populated automatically with abbreviated column names
+        // but you can add things yourself here, too
+        $sql = 'SELECT player_id,trees,pures FROM player';
+        $result['players'] = self::getCollectionFromDb($sql);
   
         $sql = "SELECT * FROM Pieces";
-        $result['pieces'] = self::getCollectionFromDb( $sql );
+        $result['pieces'] = self::getCollectionFromDb($sql);
   
         return $result;
     }
 
-    /*
-        getGameProgression:
-        
-        Compute and return the current game progression.
-        The number returned must be an integer beween 0 (=the game just started) and
-        100 (= the game is finished or almost finished).
-    
-        This method is called each time we are in a game state with the "updateGameProgression" property set to true 
-        (see states.inc.php)
-    */
     function getGameProgression(){
-        return 0;
+        return 50;
     }
 
+    function fiesta_caldera_setup(){
+        /*
+        Put pieces on board with Pyramid Arcade rules:
+        5x5 board, center square empty
+        3 trios in 8 colors
+        6 caps start on the orange and red nests
+        */
+
+        // 1D indices of spaces that need to be filled
+        $tofill = range(0,24);
+        // Mark the center square as used
+        $tofill[12] = NULL;
+        // Randomize the order
+        shuffle($tofill);
+        // Will be filled with color numbers where nests should be placed
+        $board = zeros(range(0,4),range(0,4));
+
+        // Board space to try next
+        $fi = 0;
+        // Iterate over pieces
+        for($i=0;$i<24;$i++){
+            $color = $i%8 + 1;
+            $placed = false;
+            // Be picky about placement the first time, then loosen up
+            for($picky=1 ; $picky>=0 ; $picky--){
+                // Iterate over candidate spaces
+                for($j=0;$j<25;$j++){
+                    $fi++;
+                    $fi %= 25;
+                    $k = $tofill[$fi];
+                    // Check if it's filled already
+                    if(is_null($k))
+                        continue;
+                    $x = intdiv($k,5);
+                    $y = $k%5;
+                    if($picky && borders_same($board,$x,$y,$color)){
+                        // We are still checking every square for the first time
+                        // (while being picky)
+                        // and it borders a same-colored nest
+                        continue;
+                    }
+                    // x,y is a good place for this nest
+                    $board[$x][$y] = $color;
+                    $tofill[$fi] = NULL;
+                    $placed = true;
+                    break;
+                }
+                if($placed){
+                    // Nest was placed while still being picky
+                    break;
+                }
+            }
+            if(!$placed){
+                throw new BgaVisibleSystemException(
+                    self::_('Could not place all pieces.')
+                );
+            }
+        }
+        /*
+        $board = [
+            [1,1,3,2,2],
+            [1,3,3,4,2],
+            [8,8,0,4,4],
+            [7,8,6,6,5],
+            [7,7,6,5,5]
+        ];
+        */
+
+		///////////////////////////////////
+		// Build up one big SQL command  //
+        // for all nested pieces and caps//
+		///////////////////////////////////
+		$sql = 'INSERT INTO Pieces (color,pips,x,y,z) VALUES (';
+		for($x=0;$x<5;$x++){
+			for($y=0;$y<5;$y++){
+                $color = $board[$x][$y];
+                if($color==0)
+                    continue;
+				for($pips=1;$pips<=3;$pips++){
+					$z = $pips-1;
+                    $sql .= implode(',',[$color,$pips,$x,$y,$z]).'),(';
+				}
+                if($color == 1 || $color == 2){
+                    // This is a red or orange nest, so add a cap
+                    $sql .= implode(',',[0,1,$x,$y,3]).'),(';
+                }
+			}
+		}
+		// Remove the final ',('
+		$sql=substr($sql,0,-2);
+		self::DbQuery($sql);
+    }
 
 //////////////////////////////////////////////////////////////////////////////
 //////////// Utility functions
@@ -176,14 +260,6 @@ class Volcano extends Table
     function say($s){
         // For JSON like things, use json_encode($x)
         self::notifyAllPlayers('notif_debug',$s,[]);
-    }
-    function array_key_first($x){
-        foreach($x as $key=>$value)
-            return $key;
-        return NULL;
-    }
-    function on_board($x,$y){
-        return $x>=0 && $x<5 && $y>=0 && $y<5;
     }
     function capped($x,$y){
         $sql = "SELECT piece_id FROM Pieces
@@ -262,8 +338,42 @@ class Volcano extends Table
         if(count($result)==0){
             return NULL;
         }
-        return $result[$this->array_key_first($result)];
+        return $result[array_key_first($result)];
     }
+
+    function update_score($player_id){
+        $trees = $this->count_trees($player_id);
+        $sql = 'UPDATE player
+            SET trees='.$trees['all'].',
+                pures='.$trees['pure'].'
+            WHERE player_id='.$player_id;
+        self::DbQuery($sql);
+    }
+
+    // Count the mixed and pure trees of active player
+    function count_trees($player_id){
+        $sql = "SELECT piece_id,color,pips FROM Pieces
+            WHERE owner_id=${player_id}";
+        $pieces = self::getCollectionFromDb($sql);
+
+        // An array of size counts
+        $counts = [1=>0,2=>0,3=>0];
+        // A 2D array of piece counts
+        $subcounts = zeros(range(1,9),range(1,3));
+        foreach($pieces as $piece_id => $piece){
+            $subcounts[$piece['color']][$piece['pips']] += 1;
+            $counts[$piece['pips']] += 1;
+        }
+        // The total number of trees
+        $tree_count = min($counts);
+        // For each color, the number of pure trees is the row min
+        $pure_count = 0;
+        for($i=1;$i<10;$i++){
+            $pure_count += min($subcounts[$i]);
+        }
+        return ['all' => $tree_count, 'pure' => $pure_count];
+    }
+
 
 //////////////////////////////////////////////////////////////////////////////
 //////////// Player actions
@@ -276,7 +386,7 @@ class Volcano extends Table
 
     function move_cap($x0,$y0,$x1,$y1){
         // Check that destination is on board
-        if(!$this->on_board($x1,$y1)){
+        if(!on_board($x1,$y1)){
 			throw new BgaVisibleSystemException(
 				self::_('That space is not on the board.')
             );
@@ -302,7 +412,7 @@ class Volcano extends Table
             );
         }
 
-        $cap_id = $this->array_key_first($result);
+        $cap_id = array_key_first($result);
 
         // Ensure desitation has no cap
         $sql = "SELECT piece_id FROM Pieces
@@ -343,27 +453,39 @@ class Volcano extends Table
         $destx = $x1;
         $desty = $y1;
         $source_height = $this->get_height($x0,$y0);
+        $erupted = false;
         //Flow lava while it makes sense
         while($source_height>0){
             $destx += $dx;
             $desty += $dy;
 
             // Off the board?
-            if(!$this->on_board($destx,$desty)){
+            if(!on_board($destx,$desty)){
                 break;
             }
             // Capped?
             if($this->capped($destx,$desty)){
                 break;
             }
-
+            // An eruption occurs this turn
+            if(!$erupted){
+                // This is the first flowing piece
+                $this->say(clienttranslate('An eruption occurs!'));
+                $erupted = true;
+            }
             $this->flow($x0,$y0,$source_height-1,$destx,$desty);
-
             $source_height--;
         }
+        if(!$erupted){
+            // There was no eruption, so we can stay in the same game state
+            return;
+        }
+        // Score update needs to happen before args and st functions
+        $this->update_score($this->getActivePlayerId());
+        $this->gamestate->nextState('trans_end_turn');
     }
 
-    function act_power_play($piece_id,$x,$y){
+    function power_play($piece_id,$x,$y){
         /*
         Verify player has the piece
         Ensure that space isn't capped
@@ -371,69 +493,75 @@ class Volcano extends Table
         Notify players
         */
     }
-
-    /*
-    
-    Example:
-
-    function playCard( $card_id ){
-        // Check that this is the player's turn and that it is a "possible action" at this game state (see states.inc.php)
-        self::checkAction( 'playCard' ); 
-        
-        $player_id = self::getActivePlayerId();
-        
-        // Add your game logic to play a card there 
-        ...
-        
-        // Notify all players about the card played
-        self::notifyAllPlayers( "cardPlayed", clienttranslate( '${player_name} plays ${card_name}' ), array(
-            'player_id' => $player_id,
-            'player_name' => self::getActivePlayerName(),
-            'card_name' => $card_name,
-            'card_id' => $card_id
-        ) );
-          
-    }
-    
-    */
-
     
 //////////////////////////////////////////////////////////////////////////////
 //////////// Game state arguments
 ////////////
+    // args to send to clients' onenetering function
 
-    function args_after_move_cap(){
+    function args_after_eruption(){
+        $player_id = $this->getActivePlayerId();
+        $sql = 'SELECT player_id,trees,pures FROM player
+            WHERE player_id='.$player_id;
+        $result = self::getCollectionFromDb($sql);
+        return [
+            'trees' => $result[$player_id]['trees'],
+            'pures' => $result[$player_id]['pures']
+        ];
     }
-    function args_after_power_play(){
-    }
-    /*
-        Here, you can create methods defined as "game state arguments" (see "args" property in states.inc.php).
-        These methods function is to return some additional information that is specific to the current
-        game state.
-    */
-
-    /*
-    
-    Example for game state "MyGameState":
-    
-    function argMyGameState(){
-        // Get some values from the current game situation in database...
-    
-        // return values:
-        return array(
-            'variable1' => $value1,
-            'variable2' => $value2,
-            ...
-        );
-    }    
-    */
 
 //////////////////////////////////////////////////////////////////////////////
 //////////// Game state actions
 ////////////
-    function st_after_move_cap(){
-    }
-    function st_after_power_play(){
+    function st_after_eruption(){
+        /*
+        Check for victory
+        Activate next player
+        Change state to player_turn
+        */
+        // Score was updated by eruption function
+        $player_id = $this->getActivePlayerId();
+        $sql = 'SELECT player_id,trees,pures FROM player
+            WHERE player_id='.$player_id;
+        $result = self::getCollectionFromDb($sql);
+        $trees = $result[$player_id]['trees'];
+        $pures = $result[$player_id]['pures'];
+
+        if($trees < 5 && $pures < 3){
+            // Nobody has won yet
+            self::activeNextPlayer();
+            $this->gamestate->nextState('trans_player_turn');
+            return;
+        }
+        // This player wins
+        $player_id = $this->getActivePlayerId();
+        $sql = "UPDATE player
+            SET player_score=1
+            WHERE player_id=${player_id}";
+        self::DbQuery($sql);
+
+        if($trees >= 5){
+            $this->notifyAllPlayers(
+                'notif_end_game',
+                clienttranslate('${player_name} has collected ${trees} mixed-color trios'),
+                [
+                    'player_name' => $this->getActivePlayerName(),
+                    'trees' => $trees
+                ]
+            );
+        }
+        else{
+            $this->notifyAllPlayers(
+                'notif_end_game',
+                clienttranslate('${player_name} has collected ${trees} monochrome trios'),
+                [
+                    'player_name' => $this->getActivePlayerName(),
+                    'trees' => $pures
+                ]
+            );
+        }
+
+        $this->gamestate->nextState('trans_end_game');
     }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -480,17 +608,6 @@ class Volcano extends Table
 ////////// DB upgrade
 //////////
 
-    /*
-        upgradeTableDb:
-        
-        You don't have to care about this until your game has been published on BGA.
-        Once your game is on BGA, this method is called everytime the system detects a game running with your old
-        Database scheme.
-        In this case, if you change your Database scheme, you just have to apply the needed changes in order to
-        update the game database and allow the game to continue to run with your new version.
-    
-    */
-    
     function upgradeTableDb( $from_version ){
         // $from_version is the current version of this game database, in numerical form.
         // For example, if the game was running with a release of your game named "140430-1345",
